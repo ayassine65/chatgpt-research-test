@@ -17,9 +17,21 @@ if st.button("Run one-time write/read test", type="primary"):
     try:
         raw = st.secrets["gcp_service_account_json"]
         account = json.loads(raw) if isinstance(raw, str) else dict(raw)
+        
+        # Normalize escaped newlines in the service-account private key.
+        if "private_key" in account:
+            account["private_key"] = (
+                str(account["private_key"])
+                .replace("\\\\n", "\n")
+                .replace("\\n", "\n")
+            )
+        
         creds = service_account.Credentials.from_service_account_info(
             account,
-            scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
+            scopes=[
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ],
         )
         client = gspread.authorize(creds)
         sheet = client.open(TEST_TITLE)

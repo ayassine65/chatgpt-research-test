@@ -10,7 +10,7 @@ import yfinance as yf
 from google.oauth2 import service_account
 
 st.set_page_config(page_title="Research Stock Storage Test", page_icon="🧪", layout="wide")
-st.title("ChatGPT Research — Stock Storage Test v2")
+st.title("ChatGPT Research — Stock Storage Test v2.1")
 st.info("ISOLATED TEST ONLY: This application opens only ChatGPT_Research_Integration_Test. It never opens the Wealth Command Center production spreadsheet.")
 
 TEST_TITLE = "ChatGPT_Research_Integration_Test"
@@ -123,11 +123,20 @@ if st.button("Research stocks, write to test Sheet, and verify", type="primary")
         except gspread.WorksheetNotFound:
             ws = spreadsheet.add_worksheet(title=TEST_TAB, rows=1000, cols=len(HEADERS))
         existing = ws.get_all_values()
-        if existing:
-            if existing[0] != HEADERS:
-                raise RuntimeError("Research test tab already has different headers. No write attempted.")
-        else:
+        # Google Sheets may return empty-looking rows; check actual cell content.
+        has_content = any(str(cell).strip() for row in existing for cell in row)
+        if not has_content:
             ws.update(range_name="A1", values=[HEADERS], value_input_option="RAW")
+            confirmed_header = ws.row_values(1)
+            if confirmed_header != HEADERS:
+                raise RuntimeError("Header initialization could not be verified. No research rows written.")
+        elif ws.row_values(1) != HEADERS:
+            actual_headers = ws.row_values(1)
+            raise RuntimeError(
+                "Research test tab has existing content with incompatible headers; no write attempted. "
+                f"Found {len(actual_headers)} header cells; expected {len(HEADERS)}. "
+                f"First five existing cells: {actual_headers[:5]!r}"
+            )
         ws.append_rows(rows, value_input_option="RAW")
         stored = ws.get_all_values()
         matching = [r for r in stored[1:] if r and r[0] == run_id]
